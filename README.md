@@ -14,41 +14,28 @@ renames or overwrites anything, and existing episodes are always skipped.
 
 ## Install on Unraid
 
-All commands run in the Unraid terminal (top-right `>_` icon in the web UI).
+The image is built by GitHub Actions and published as `ghcr.io/jezzarium/anime-dl`.
 
-**1. Get the source**
-
-```sh
-mkdir -p /mnt/user/appdata/anime-dl
-git clone https://github.com/Jezzarium/anime-dl.git /mnt/user/appdata/anime-dl/src
-```
-
-**2. Build the image**
+**1. Install the template and generate a token** (Unraid terminal, top-right `>_` icon)
 
 ```sh
-cd /mnt/user/appdata/anime-dl/src
-docker build -t anime-dl:latest .
-```
-
-**3. Install the template and generate a token**
-
-```sh
-cp my-anime-dl.xml /boot/config/plugins/dockerMan/templates-user/
+wget -O /boot/config/plugins/dockerMan/templates-user/my-anime-dl.xml \
+  https://raw.githubusercontent.com/Jezzarium/anime-dl/main/my-anime-dl.xml
 openssl rand -hex 24      # copy this, it's your password for the UI and API
 ```
 
-**4. Add the container**
+**2. Add the container**
 
 Docker tab → **Add Container** → Template: **anime-dl** (under User templates).
 
 - **Anime folder**: the host folder for anime, e.g. `/mnt/user/media/anime` (create it first if needed)
-- **API token**: paste the token from step 3
+- **API token**: paste the token from step 1
 - **Jellyfin URL / API key** (optional): e.g. `http://192.168.1.10:8096` and a key from
   Jellyfin → Dashboard → API Keys. Lets the app trigger a library scan after downloads.
 
 Click **Apply**, then open `http://<unraid-ip>:8686` and enter the token.
 
-**5. Jellyfin**
+**3. Jellyfin**
 
 Add a library: Content type **Shows**, folder = the same anime folder (as Jellyfin's
 container sees it). Under the library's settings you can enable **Real-time monitoring**
@@ -61,9 +48,11 @@ in the Jellyfin container is a cheap extra safety net.
 
 - **Site changed / downloads break:** click **Update ani-cli** in the UI. The updated
   script is kept in appdata and survives restarts.
-- **Everything else:** `cd /mnt/user/appdata/anime-dl/src && git pull && docker build -t anime-dl:latest .`
-  then restart the container. (Unraid's "check for updates" will say "not available" because
-  the image is local; that's expected.)
+- **Everything else:** every push to `main` publishes a new `:latest` image. In the Docker tab,
+  click **Check for Updates**, then **apply update** on anime-dl.
+
+To build locally instead: `git clone` the repo, `docker build -t anime-dl:latest .`, and set
+the template's Repository to `anime-dl:latest`.
 
 ## Tips
 
