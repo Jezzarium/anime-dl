@@ -1,3 +1,7 @@
+For my unraid server, uses ani-cli to download animes to my jellyfin. entirely vibe coded. i just want to watch anime
+
+
+
 # anime-dl
 
 A small web UI + API around [ani-cli](https://github.com/pystardust/ani-cli) that downloads
