@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stand-in for fzf so ani-cli can run headless.
+# Writes the menu ani-cli offers (prompt + entries) to $CAP_FILE and selects nothing,
+# unless CAP_PICK_FIRST=1, in which case it picks the first entry.
+_input=$(cat)
+{ printf 'PROMPT=%s\n' "$*"; printf '%s\n' "$_input"; } >"$CAP_FILE"
+[ "$CAP_PICK_FIRST" = 1 ] && printf '%s\n' "$_input" | head -n 1
+exit 0

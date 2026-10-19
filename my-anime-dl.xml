@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>anime-dl</Name>
+  <Repository>anime-dl:latest</Repository>
+  <Network>bridge</Network>
+  <Project>https://github.com/Jezzarium/anime-dl</Project>
+  <Privileged>false</Privileged>
+  <Overview>Web UI + API around ani-cli. Downloads anime into a Jellyfin-friendly folder. Only sees the anime folder you map.</Overview>
+  <Category>Downloaders: MediaApp:Video</Category>
+  <WebUI>http://[IP]:[PORT:8686]/</WebUI>
+  <Config Name="Web UI port" Target="8686" Default="8686" Mode="tcp" Type="Port" Display="always" Required="true">8686</Config>
+  <Config Name="Anime folder" Target="/anime" Default="/mnt/user/media/anime" Mode="rw" Description="The ONLY share path this container can see. Point your Jellyfin anime library at the same folder." Type="Path" Display="always" Required="true">/mnt/user/media/anime</Config>
+  <Config Name="Appdata" Target="/config" Default="/mnt/user/appdata/anime-dl" Mode="rw" Type="Path" Display="advanced" Required="true">/mnt/user/appdata/anime-dl</Config>
+  <Config Name="API token" Target="API_TOKEN" Default="" Description="Password for the web UI and API. 16+ characters. Generate with: openssl rand -hex 24" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="Jellyfin URL" Target="JELLYFIN_URL" Default="" Description="Optional, e.g. http://192.168.1.10:8096 - triggers a library scan after downloads" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Jellyfin API key" Target="JELLYFIN_API_KEY" Default="" Description="Optional. Jellyfin Dashboard - API Keys" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Quality" Target="QUALITY" Default="best" Description="best, worst, or a resolution like 1080 / 720" Type="Variable" Display="advanced" Required="false">best</Config>
+  <Config Name="Max queued episodes" Target="MAX_QUEUED_EPISODES" Default="500" Type="Variable" Display="advanced" Required="false">500</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Type="Variable" Display="advanced" Required="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Type="Variable" Display="advanced" Required="false">100</Config>
+</Container>

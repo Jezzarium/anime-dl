@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>anime-dl</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #fff; --text: #1b1f24; --muted: #667085; --line: #e3e6ea;
+    --accent: #5b5bd6; --accent-text: #fff; --ok: #1a7f4b; --bad: #c0392b; --warn: #a76b00;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111316; --panel: #1a1d21; --text: #e6e8eb; --muted: #9aa3ad; --line: #2b3036;
+      --accent: #8b8bf0; --accent-text: #111; --ok: #4cc38a; --bad: #ff6b5e; --warn: #f0b429;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  form, .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input[type=text], input[type=password], input[type=number], select {
+    font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px;
+    background: var(--bg); color: var(--text); min-width: 0;
+  }
+  input.grow { flex: 1 1 220px; }
+  button { font: inherit; padding: 8px 14px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  label { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+  .results { list-style: none; margin: 12px 0 0; padding: 0; }
+  .results li { padding: 9px 10px; border-radius: 7px; cursor: pointer; }
+  .results li:hover, .results li.sel { background: var(--bg); }
+  .results li.sel { outline: 2px solid var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 12px 0; }
+  .grid label { flex-direction: column; align-items: stretch; gap: 4px; color: var(--muted); font-size: 12px; }
+  .job { border-top: 1px solid var(--line); padding: 12px 0; }
+  .job:first-of-type { border-top: 0; }
+  .job-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .eps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .ep { font-size: 12px; padding: 2px 7px; border-radius: 5px; border: 1px solid var(--line); position: relative; overflow: hidden; }
+  .ep .bar { position: absolute; inset: 0 auto 0 0; background: var(--accent); opacity: .25; }
+  .ep.done { color: var(--ok); border-color: var(--ok); }
+  .ep.failed { color: var(--bad); border-color: var(--bad); }
+  .ep.skipped, .ep.cancelled { color: var(--muted); }
+  .ep.downloading { color: var(--accent); border-color: var(--accent); }
+  .muted { color: var(--muted); font-size: 13px; }
+  .err { color: var(--bad); font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
+  .small { font-size: 12px; padding: 4px 9px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>anime-dl</h1>
+  <p class="sub" id="status">Search, pick episodes, and they land in your Jellyfin library.</p>
+
+  <section class="panel" id="login" hidden>
+    <h2>Enter your API token</h2>
+    <form id="login-form">
+      <input type="password" id="token" class="grow" placeholder="API_TOKEN from the container settings" autocomplete="current-password">
+      <button class="primary">Save</button>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <section class="panel">
+      <h2>Search</h2>
+      <form id="search-form">
+        <input type="text" id="query" class="grow" placeholder="e.g. frieren" autofocus>
+        <button class="primary" id="search-btn">Search</button>
+      </form>
+      <ul class="results" id="results"></ul>
+      <div class="err" id="search-err"></div>
+    </section>
+
+    <section class="panel" id="picker" hidden>
+      <h2 id="picker-title"></h2>
+      <div class="muted" id="ep-info">Loading episodes…</div>
+      <div class="grid">
+        <label>Episodes
+          <select id="ep-mode">
+            <option value="all">All (skips ones you have)</option>
+            <option value="latest">Latest only</option>
+            <option value="range">Range…</option>
+          </select>
+        </label>
+        <label id="range-wrap" hidden>Range (e.g. 1-12 or 3,5,7)
+          <input type="text" id="ep-range">
+        </label>
+        <label>Show folder in Jellyfin
+          <input type="text" id="show">
+        </label>
+        <label>Season
+          <input type="number" id="season" min="0" max="99" value="1">
+        </label>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="dub"> English dub</label>
+        <span style="flex:1"></span>
+        <button class="primary" id="queue-btn" disabled>Queue download</button>
+      </div>
+      <div class="err" id="picker-err"></div>
+    </section>
+
+    <section class="panel">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">Downloads</h2>
+        <div class="row">
+          <button class="small" id="clear-btn">Clear finished</button>
+          <button class="small" id="update-btn" title="Fetch the latest ani-cli (fixes broken sources)">Update ani-cli</button>
+          <button class="small" id="logout-btn">Forget token</button>
+        </div>
+      </div>
+      <div id="jobs" style="margin-top:8px"><p class="muted">Nothing queued yet.</p></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let token = null;
+try { token = localStorage.getItem("anime-dl-token"); } catch (e) {}
+let picked = null, available = [];
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body ? "POST" : "GET",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { showLogin(); throw new Error("Bad token"); }
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function showLogin() { $("login").hidden = false; $("app").hidden = true; }
+function showApp() { $("login").hidden = true; $("app").hidden = false; refresh(); loadStatus(); }
+
+$("login-form").onsubmit = (e) => {
+  e.preventDefault();
+  token = $("token").value.trim();
+  try { localStorage.setItem("anime-dl-token", token); } catch (e) {}
+  showApp();
+};
+$("logout-btn").onclick = () => { try { localStorage.removeItem("anime-dl-token"); } catch (e) {} token = null; showLogin(); };
+
+// "Sousou no Frieren 3rd Season" -> show "Sousou no Frieren", season 3
+function guessShow(title) {
+  let m = title.match(/^(.*?)[\s:-]+(?:Season|S)\s*(\d+)$/i) || title.match(/^(.*?)\s+(\d+)(?:st|nd|rd|th)\s+Season$/i);
+  return m ? { show: m[1].trim(), season: +m[2] } : { show: title, season: 1 };
+}
+
+$("search-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const q = $("query").value.trim();
+  if (!q) return;
+  $("search-btn").disabled = true; $("search-err").textContent = ""; $("results").innerHTML = "";
+  $("picker").hidden = true;
+  try {
+    const { results } = await api("/api/search", { query: q });
+    if (!results.length) $("search-err").textContent = "No results.";
+    for (const r of results) {
+      const li = document.createElement("li");
+      li.textContent = r.title;
+      li.onclick = () => pick(q, r, li);
+      $("results").appendChild(li);
+    }
+  } catch (err) { $("search-err").textContent = err.message; }
+  $("search-btn").disabled = false;
+};
+
+async function pick(query, result, li) {
+  document.querySelectorAll(".results li").forEach((x) => x.classList.remove("sel"));
+  li.classList.add("sel");
+  picked = { query, ...result };
+  const g = guessShow(result.title);
+  $("picker").hidden = false; $("picker-title").textContent = result.title;
+  $("show").value = g.show; $("season").value = g.season;
+  $("ep-info").textContent = "Loading episodes…"; $("picker-err").textContent = "";
+  $("queue-btn").disabled = true;
+  try {
+    const { episodes } = await api("/api/episodes", { query, index: result.index });
+    if (picked.index !== result.index || picked.query !== query) return;
+    available = episodes;
+    $("ep-info").textContent = episodes.length
+      ? `${episodes.length} episode${episodes.length > 1 ? "s" : ""} available (${episodes[0]}–${episodes[episodes.length - 1]})`
+      : "No episodes available yet.";
+    $("ep-range").value = episodes.length ? `${episodes[0]}-${episodes[episodes.length - 1]}` : "";
+    $("queue-btn").disabled = !episodes.length;
+  } catch (err) { $("ep-info").textContent = ""; $("picker-err").textContent = err.message; }
+}
+
+$("ep-mode").onchange = () => { $("range-wrap").hidden = $("ep-mode").value !== "range"; };
+
+$("queue-btn").onclick = async () => {
+  const mode = $("ep-mode").value;
+  $("queue-btn").disabled = true; $("picker-err").textContent = "";
+  try {
+    await api("/api/download", {
+      query: picked.query, index: picked.index, title: picked.title,
+      episodes: mode === "range" ? $("ep-range").value : mode,
+      show: $("show").value, season: +$("season").value, dub: $("dub").checked,
+    });
+    $("picker").hidden = true;
+    refresh();
+  } catch (err) { $("picker-err").textContent = err.message; }
+  $("queue-btn").disabled = false;
+};
+
+function renderJobs(jobs) {
+  const box = $("jobs");
+  if (!jobs.length) { box.innerHTML = '<p class="muted">Nothing queued yet.</p>'; return; }
+  box.innerHTML = "";
+  for (const job of jobs) {
+    const counts = {};
+    job.episodes.forEach((e) => counts[e.status] = (counts[e.status] || 0) + 1);
+    const active = counts.queued || counts.downloading;
+    const div = document.createElement("div");
+    div.className = "job";
+    const head = document.createElement("div");
+    head.className = "job-head";
+    const name = document.createElement("div");
+    name.innerHTML = "<strong></strong><div class='muted'></div>";
+    name.querySelector("strong").textContent = job.title + (job.dub ? " (dub)" : "");
+    name.querySelector(".muted").textContent =
+      `→ ${job.show} / Season ${job.season} · ` + Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(", ");
+    const btns = document.createElement("div");
+    btns.className = "row";
+    if (active) btns.appendChild(button("Cancel", () => api(`/api/jobs/${job.id}/cancel`, {}).then(refresh)));
+    if (counts.failed || counts.cancelled) btns.appendChild(button("Retry", () => api(`/api/jobs/${job.id}/retry`, {}).then(refresh)));
+    head.append(name, btns);
+    const eps = document.createElement("div");
+    eps.className = "eps";
+    for (const e of job.episodes) {
+      const s = document.createElement("span");
+      s.className = "ep " + e.status;
+      s.title = e.status + (e.error ? ": " + e.error : "");
+      if (e.status === "downloading") {
+        const bar = document.createElement("span");
+        bar.className = "bar"; bar.style.width = e.progress + "%";
+        s.appendChild(bar);
+      }
+      s.appendChild(document.createTextNode(e.ep + (e.status === "downloading" ? ` · ${Math.round(e.progress)}%` : "")));
+      eps.appendChild(s);
+    }
+    div.append(head, eps);
+    const firstErr = job.episodes.find((e) => e.status === "failed");
+    if (firstErr) {
+      const err = document.createElement("div");
+      err.className = "err"; err.textContent = `Ep ${firstErr.ep}: ${firstErr.error}`;
+      div.appendChild(err);
+    }
+    box.appendChild(div);
+  }
+}
+
+function button(text, fn) {
+  const b = document.createElement("button");
+  b.className = "small"; b.textContent = text; b.onclick = fn;
+  return b;
+}
+
+async function refresh() {
+  if (!token) return;
+  try { renderJobs((await api("/api/jobs")).jobs); } catch (e) {}
+}
+async function loadStatus() {
+  try {
+    const s = await api("/api/status");
+    $("status").textContent = `ani-cli ${s.ani_cli} · ${s.queued} queued · Jellyfin auto-refresh ${s.jellyfin ? "on" : "off"}`;
+  } catch (e) {}
+}
+
+$("clear-btn").onclick = () => api("/api/jobs/clear", {}).then(refresh);
+$("update-btn").onclick = async () => {
+  $("update-btn").disabled = true;
+  try {
+    const r = await api("/api/update-ani-cli", {});
+    alert(r.before === r.after ? `ani-cli ${r.after} is up to date.` : `Updated ani-cli ${r.before} → ${r.after}`);
+    loadStatus();
+  } catch (err) { alert(err.message); }
+  $("update-btn").disabled = false;
+};
+
+setInterval(() => { if (!document.hidden) { refresh(); loadStatus(); } }, 3000);
+token ? showApp() : showLogin();
+</script>
+</body>
+</html>
