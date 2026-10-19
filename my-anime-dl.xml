@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>anime-dl</Name>
-  <Repository>anime-dl:latest</Repository>
+  <Repository>ghcr.io/jezzarium/anime-dl:latest</Repository>
+  <Registry>https://github.com/Jezzarium/anime-dl/pkgs/container/anime-dl</Registry>
   <Network>bridge</Network>
   <Project>https://github.com/Jezzarium/anime-dl</Project>
   <Privileged>false</Privileged>
