@@ -200,6 +200,8 @@ def episodes(query, index):
             return [e for e in menu["items"] if EPISODE_RE.match(e)]
         if hist:  # a single episode is auto-selected without a menu
             return [hist["episode"]]
+        if any("Invalid episode selection" in l for l in out):  # no episodes out yet, so no menu
+            return []
         raise RuntimeError(last_error(out))
 
 
@@ -276,6 +278,8 @@ def create_job(body):
     dub = bool(body.get("dub", False))
 
     available = episodes(query, index)
+    if not available:
+        raise ValueError("no episodes released yet")
     wanted = body.get("episodes", "all")
     if wanted == "all":
         chosen = available
