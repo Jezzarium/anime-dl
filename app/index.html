@@ -253,6 +253,13 @@ function renderJobs(jobs) {
       eps.appendChild(s);
     }
     div.append(head, eps);
+    const retrying = job.episodes.find((e) => e.status === "downloading" && e.error);
+    if (retrying) {
+      const note = document.createElement("div");
+      note.className = "muted"; note.style.marginTop = "6px";
+      note.textContent = `Ep ${retrying.ep}: network trouble, ${retrying.error}`;
+      div.appendChild(note);
+    }
     const firstErr = job.episodes.find((e) => e.status === "failed");
     if (firstErr) {
       const err = document.createElement("div");
