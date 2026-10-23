@@ -27,6 +27,9 @@ API_TOKEN = os.environ.get("API_TOKEN", "")
 PORT = int(os.environ.get("PORT", "8686"))
 QUALITY = os.environ.get("QUALITY", "best")
 MAX_QUEUED = int(os.environ.get("MAX_QUEUED_EPISODES", "500"))
+# Waits before retrying an episode that failed on a network error; one retry per entry.
+RETRY_DELAYS = [int(x) for x in os.environ.get("RETRY_DELAYS", "30,90,300").split(",") if x.strip()]
+EPISODE_GAP = int(os.environ.get("EPISODE_GAP", "3"))  # pause between episodes, to go easy on the site
 SUB_LANG = os.environ.get("SUBTITLE_LANG", "en")
 JELLYFIN_URL = os.environ.get("JELLYFIN_URL", "").rstrip("/")
 JELLYFIN_API_KEY = os.environ.get("JELLYFIN_API_KEY", "")
@@ -40,6 +43,9 @@ INCOMING = os.path.join(ANIME_DIR, ".incoming")  # dot-folder: Jellyfin ignores 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 PROGRESS_RE = re.compile(r"\[download\]\s+([\d.]+)%")
 EPISODE_RE = re.compile(r"^\d+(\.\d+)?$")
+# Errors worth retrying: timeouts, dropped connections, rate limits, server errors.
+TRANSIENT_RE = re.compile(r"Connection error|no HTTP response|curl exit|HTTP (429|5\d\d)|timed out|"
+                          r"Blocked by cloudflare|Request failed", re.I)
 QUERY_RE = re.compile(r"^[\w][\w \-'.!:,]{0,99}$")
 
 lock = threading.Lock()
@@ -364,6 +370,16 @@ def download(job, ep):
         shutil.rmtree(wd, ignore_errors=True)
 
 
+def wait_unless_cancelled(ep, seconds):
+    """Sleep, waking early if the episode gets cancelled. Returns False if it was."""
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        if ep["status"] == "cancelled":
+            return False
+        time.sleep(1)
+    return ep["status"] != "cancelled"
+
+
 def worker():
     pending_refresh, last_refresh = False, 0
     while True:
@@ -382,10 +398,21 @@ def worker():
             continue
 
         print("downloading %s ep %s" % (job["title"], ep["ep"]), flush=True)
-        try:
-            status, error = download(job, ep)
-        except Exception as e:
-            status, error = "failed", str(e)
+        for attempt in range(len(RETRY_DELAYS) + 1):
+            try:
+                status, error = download(job, ep)
+            except Exception as e:
+                status, error = "failed", str(e)
+            if status != "failed" or not TRANSIENT_RE.search(error) or attempt == len(RETRY_DELAYS):
+                break
+            delay = RETRY_DELAYS[attempt]
+            print("  network error, retry %d/%d in %ds: %s" % (attempt + 1, len(RETRY_DELAYS), delay, error), flush=True)
+            with lock:
+                ep["progress"] = 0
+                ep["error"] = "retry %d/%d in %ds: %s" % (attempt + 1, len(RETRY_DELAYS), delay, error)
+            if not wait_unless_cancelled(ep, delay):
+                status, error = "cancelled", ""
+                break
         with lock:
             if ep["status"] != "cancelled":
                 ep["status"], ep["error"] = status, error
@@ -394,6 +421,8 @@ def worker():
             current["job"] = None
             save_jobs()
         print("  -> %s %s" % (status, error), flush=True)
+        if status in ("done", "failed"):
+            time.sleep(EPISODE_GAP)
         if status == "done":
             pending_refresh = True
             if time.time() - last_refresh > 600:  # keep Jellyfin current during long batches

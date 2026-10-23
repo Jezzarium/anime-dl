@@ -99,6 +99,8 @@ curl -s -H "$T" -d '{"query":"dandadan","index":1,"title":"Dandadan","episodes":
 | `API_TOKEN` | (required) | 16+ characters |
 | `QUALITY` | `best` | `best`, `worst`, or e.g. `1080` |
 | `MAX_QUEUED_EPISODES` | `500` | queue cap |
+| `RETRY_DELAYS` | `30,90,300` | seconds to wait before each retry of an episode that hit a network error (timeouts, rate limits) |
+| `EPISODE_GAP` | `3` | seconds to pause between episodes |
 | `SUBTITLE_LANG` | `en` | language tag on downloaded `.vtt` subtitles |
 | `JELLYFIN_URL`, `JELLYFIN_API_KEY` | | optional library refresh |
 | `PUID`, `PGID`, `UMASK` | `99`, `100`, `002` | file ownership (Unraid's nobody:users) |
